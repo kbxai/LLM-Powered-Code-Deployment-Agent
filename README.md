@@ -1,5 +1,24 @@
 # TDS AI: LLM-Powered Code Deployment Agent 
 
+| | |
+|---|---|
+| **What it does** | Takes a natural-language brief (with optional attachments), asks an LLM to generate a static web app, creates or updates a GitHub repository, enables GitHub Pages and checks that the live URL responds |
+| **Context** | IITM Tools in Data Science course project |
+| **Stack** | FastAPI, Pydantic, PyGithub and the GitHub REST API, an OpenAI-compatible client (default model `openai/gpt-4o` through the course AIPipe proxy), Docker, Hugging Face Space |
+| **Built with** | AI coding tools (Claude Code, Google Antigravity) |
+
+### How it works
+1. A build request arrives at the FastAPI endpoint and is validated with Pydantic.
+2. Code generation runs as a FastAPI background task.
+3. The generated files are committed to a new or existing GitHub repository and GitHub Pages is enabled.
+4. The service polls the Pages URL until it responds or times out.
+5. A revision request updates an existing repository the same way.
+
+### Known limitations
+- Generation runs as in-process background tasks (no external job queue).
+- No automated tests in this repo.
+
+
 An intelligent FastAPI-based service that automatically generates HTML web applications from natural language briefs using LLM and deploys them to GitHub Pages. Perfect for rapid prototyping and automated web development!
 
 ##  Features
