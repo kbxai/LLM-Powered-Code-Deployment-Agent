@@ -2,6 +2,7 @@
 
 | | |
 |---|---|
+| **Live demo** | [Hugging Face Space](https://huggingface.co/spaces/24f2007692/llm-code-deployer) (API endpoint in "Using via Hugging Face" below; the free Space may take a minute to wake if idle) |
 | **What it does** | Takes a natural-language brief (with optional attachments), asks an LLM to generate a static web app, creates or updates a GitHub repository, enables GitHub Pages and checks that the live URL responds |
 | **Context** | IITM Tools in Data Science course project |
 | **Stack** | FastAPI, Pydantic, PyGithub and the GitHub REST API, an OpenAI-compatible client (default model `openai/gpt-4o` through the course AIPipe proxy), Docker, Hugging Face Space |
