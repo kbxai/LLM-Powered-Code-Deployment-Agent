@@ -542,12 +542,23 @@ def handle_build_request(request_data: BuildRequest, background_tasks: Backgroun
 
     return {"status": "accepted", "message": "The build and deploy process has been started in the background."}
 
+HERE = os.path.dirname(__file__)
+
+def serve_page(name: str):
+    path = os.path.join(HERE, name)
+    if os.path.exists(path):
+        return FileResponse(path)
+    return HTMLResponse("<h2>LLM Code Deployer is running.</h2>", status_code=404)
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    index_path = os.path.join(os.path.dirname(__file__), "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return HTMLResponse("<h2>LLM Code Deployer is running.</h2><p>Please ensure index.html is present.</p>")
+    """Public page: what the service does, how to call it and its limits."""
+    return serve_page("index.html")
+
+@app.get("/console", response_class=HTMLResponse)
+async def console():
+    """Operator console for manual builds. Every build still needs MY_SECRET."""
+    return serve_page("console.html")
 
 @app.get("/api/status")
 async def status():

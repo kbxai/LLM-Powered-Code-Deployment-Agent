@@ -1,443 +1,186 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LLM Code Deployer</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLM Code Deployer: brief in, live site out</title>
+  <meta name="description" content="A FastAPI service that turns a one-paragraph brief into a static web app with an LLM, pushes it to a new GitHub repository and publishes it on GitHub Pages.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-color: #0b0f19;
-      --card-bg: #111827;
-      --card-border: #1f2937;
-      --input-bg: #0d131f;
-      --input-border: #374151;
-      --text-main: #f9fafb;
-      --text-muted: #9ca3af;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --radius: 8px;
+      --bg: #f4f6f3;
+      --surface: #ffffff;
+      --ink: #16191d;
+      --muted: #545b62;
+      --line: #d5dad4;
+      --live: #1d6b47;
+      --code-bg: #1b1f23;
+      --code-ink: #e6e9e4;
+      --code-dim: #9aa39c;
+      --serif: "Source Serif 4", Georgia, serif;
+      --sans: "IBM Plex Sans", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
     }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 400 17px/1.65 var(--sans); }
+    a { color: var(--live); text-underline-offset: 3px; }
+    a:hover { color: var(--ink); }
+    :focus-visible { outline: 3px solid var(--live); outline-offset: 2px; border-radius: 2px; }
+    .wrap { width: min(100% - 32px, 760px); margin: 0 auto; }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Inter', sans-serif;
+    header.top { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+                 padding: 22px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+    header.top strong { font-weight: 600; }
+    header.top nav { display: flex; gap: 20px; }
+
+    .hero { padding: 56px 0 40px; }
+    h1 { font: 600 clamp(34px, 6vw, 50px)/1.08 var(--serif); letter-spacing: -0.015em; margin: 0 0 20px; max-width: 18ch; }
+    .lead { font-size: 19px; color: var(--muted); max-width: 60ch; margin: 0 0 24px; }
+    .status { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; color: var(--muted); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); flex: none; }
+    .dot.on { background: var(--live); }
+
+    section { padding: 40px 0; border-top: 1px solid var(--line); }
+    h2 { font: 600 28px/1.2 var(--serif); margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 24px; max-width: 62ch; }
+
+    ol.steps { list-style: none; counter-reset: step; padding: 0; margin: 0; }
+    ol.steps li { counter-increment: step; display: grid; grid-template-columns: 36px 1fr; column-gap: 14px;
+                  padding: 16px 0; border-bottom: 1px solid var(--line); }
+    ol.steps li:last-child { border-bottom: 0; }
+    ol.steps li::before { content: counter(step); font: 500 15px/1.65 var(--mono); color: var(--live); }
+    ol.steps h3 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
+    ol.steps p { margin: 0; color: var(--muted); }
+    code { font: 400 0.88em/1 var(--mono); background: #e7ebe6; padding: 2px 5px; border-radius: 3px; color: var(--ink); }
+
+    pre { margin: 0 0 20px; padding: 18px 20px; background: var(--code-bg); color: var(--code-ink); border-radius: 6px;
+          overflow-x: auto; font: 400 14px/1.6 var(--mono); }
+    pre code { background: none; padding: 0; color: inherit; font: inherit; }
+    pre .c { color: var(--code-dim); }
+    .label { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+
+    ul.limits { margin: 0; padding-left: 20px; }
+    ul.limits li { margin-bottom: 10px; }
+
+    footer { padding: 32px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 15px; }
+    footer p { margin: 0 0 6px; }
+
+    @media (max-width: 520px) {
+      body { font-size: 16px; }
+      .hero { padding: 40px 0 32px; }
+      .lead { font-size: 17px; }
+      ol.steps li { grid-template-columns: 28px 1fr; }
     }
-
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      padding: 24px 16px;
-      line-height: 1.5;
-    }
-
-    .container {
-      max-width: 860px;
-      margin: 0 auto;
-    }
-
-    header {
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--card-border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
-    .title-group h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-
-    .title-group p {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-    }
-
-    .system-status {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      padding: 6px 12px;
-      border-radius: 9999px;
-      font-size: 0.8rem;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: var(--warning);
-    }
-
-    .status-dot.active {
-      background-color: var(--success);
-    }
-
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    @media (max-width: 640px) {
-      .grid-2 {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-
-    .card-title {
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 14px;
-      color: var(--text-main);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .badge-bar {
-      display: flex;
-      gap: 8px;
-      font-size: 0.75rem;
-    }
-
-    .badge {
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: #1f2937;
-      color: var(--text-muted);
-    }
-
-    .badge.ready {
-      background: #064e3b;
-      color: #6ee7b7;
-    }
-
-    label {
-      display: block;
-      font-size: 0.82rem;
-      font-weight: 500;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
-
-    .field {
-      margin-bottom: 14px;
-    }
-
-    input, textarea, select {
-      width: 100%;
-      background-color: var(--input-bg);
-      border: 1px solid var(--input-border);
-      border-radius: 6px;
-      color: var(--text-main);
-      padding: 9px 12px;
-      font-size: 0.875rem;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-
-    input:focus, textarea:focus {
-      border-color: var(--accent);
-    }
-
-    textarea {
-      resize: vertical;
-      min-height: 85px;
-      font-family: inherit;
-    }
-
-    button {
-      background-color: var(--accent);
-      color: white;
-      border: none;
-      border-radius: 6px;
-      padding: 10px 16px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: background-color 0.15s;
-    }
-
-    button:hover {
-      background-color: var(--accent-hover);
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .btn-secondary {
-      background-color: transparent;
-      border: 1px solid var(--card-border);
-      color: var(--text-muted);
-    }
-
-    .btn-secondary:hover {
-      background-color: #1f2937;
-      color: var(--text-main);
-    }
-
-    .console-box {
-      background-color: #030712;
-      border: 1px solid var(--card-border);
-      border-radius: 6px;
-      padding: 12px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      color: #d1d5db;
-      min-height: 120px;
-      max-height: 250px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-
-    .hint {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    .log-success { color: #34d399; }
-    .log-error { color: #f87171; }
-    .log-info { color: #60a5fa; }
   </style>
 </head>
 <body>
-
-  <div class="container">
-    <header>
-      <div class="title-group">
-        <h1>LLM Code Deployer</h1>
-        <p>Autonomous AI Code Generation &amp; GitHub Pages Deployment Engine</p>
-      </div>
-      <div class="system-status">
-        <span class="status-dot" id="serverDot"></span>
-        <span id="serverStatusText">Checking Service...</span>
-      </div>
+  <div class="wrap">
+    <header class="top">
+      <strong>LLM Code Deployer</strong>
+      <nav aria-label="Project links">
+        <a href="https://github.com/kbxai/LLM-Powered-Code-Deployment-Agent">Source</a>
+        <a href="/console">Console</a>
+      </nav>
     </header>
 
-    <div class="card">
-      <div class="card-title">
-        <span>Provider Status</span>
-        <div class="badge-bar">
-          <span class="badge" id="badgeAiPipe">AI Pipe: Off</span>
-          <span class="badge" id="badgeGemini">Gemini: Off</span>
-          <span class="badge" id="badgeGithub">GitHub: Off</span>
-        </div>
+    <main>
+      <div class="hero">
+        <h1>A brief goes in, a live website comes out.</h1>
+        <p class="lead">
+          Send a one-paragraph description of a small web app. This FastAPI service asks an LLM to write it,
+          pushes the files to a new GitHub repository, turns on GitHub Pages and waits until the page is live.
+          It was built for the IITM Tools in Data Science course, where an evaluator sends the briefs.
+        </p>
+        <p class="status" aria-live="polite"><span class="dot" id="dot"></span><span id="status">Checking the service…</span></p>
       </div>
-      <p style="font-size: 0.82rem; color: var(--text-muted);">
-        The backend accepts automated payloads on <code style="color:#60a5fa;">/api/build</code>. You can also trigger or test builds manually below.
-      </p>
-    </div>
 
-    <div class="card">
-      <div class="card-title">Dispatch Deployment Task</div>
-      <form id="buildForm">
-        <div class="grid-2">
-          <div class="field">
-            <label for="task">Task Name (Repository Name)</label>
-            <input type="text" id="task" required placeholder="e.g. currency-converter-demo" value="demo-calc-task" />
-            <div class="hint">Will be created on GitHub under your account.</div>
-          </div>
-          <div class="field">
-            <label for="secret">Server Secret</label>
-            <input type="password" id="secret" required placeholder="MY_SECRET from environment" />
-          </div>
-        </div>
+      <section aria-labelledby="flow">
+        <h2 id="flow">What happens to a request</h2>
+        <p class="sub">Each step below maps to code in <code>main.py</code>. The request returns as soon as it is accepted; the rest runs in the background.</p>
+        <ol class="steps">
+          <li><div><h3>Check the request</h3><p>Pydantic validates the JSON body and the shared secret is compared in constant time. A wrong secret gets a 403 before any work starts.</p></div></li>
+          <li><div><h3>Read the attachments</h3><p>Files sent as data URIs or links are decoded and passed to the model as context.</p></div></li>
+          <li><div><h3>Ask the LLM for the files</h3><p><code>call_llm</code> requests one JSON object of filename to content. It tries an OpenAI-compatible endpoint (AI Pipe) first, then Gemini models, two attempts each.</p></div></li>
+          <li><div><h3>Create or revise the repository</h3><p>Round 1 creates a new public repository. Round 2 reads the code already there and asks the model for a revision.</p></div></li>
+          <li><div><h3>Commit the result</h3><p>The generated files are committed with a README and an MIT licence.</p></div></li>
+          <li><div><h3>Publish and verify</h3><p>GitHub Pages is turned on, then the Pages URL is polled until it answers or the timeout (180 seconds by default) runs out.</p></div></li>
+          <li><div><h3>Report back</h3><p>The repository URL, commit SHA and Pages URL are posted to the callback URL, retrying up to four times with 1, 2, 4 and 8 second waits.</p></div></li>
+        </ol>
+      </section>
 
-        <div class="grid-2">
-          <div class="field">
-            <label for="email">Notification Email</label>
-            <input type="email" id="email" required placeholder="student@example.com" value="test@example.com" />
-          </div>
-          <div class="field">
-            <label for="round">Round</label>
-            <select id="round">
-              <option value="1">Round 1 (New Project Creation)</option>
-              <option value="2">Round 2 (Revision / Multi-file update)</option>
-            </select>
-          </div>
-        </div>
+      <section aria-labelledby="api">
+        <h2 id="api">Call it</h2>
+        <p class="sub">The service is protected by a secret, so these examples will not run without it. They show the exact shape of the API.</p>
+        <p class="label">Request</p>
+<pre><code>curl -X POST https://24f2007692-llm-code-deployer.hf.space/api/build \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "you@example.com",
+    "secret": "&lt;server secret&gt;",
+    "task": "unit-converter",
+    "round": 1,
+    "nonce": "any-unique-string",
+    "brief": "A unit converter for length and weight with a dark mode toggle.",
+    "evaluation_url": "https://your-server.example/callback",
+    "checks": ["document.querySelector(\"#convert\") !== null"]
+  }'</code></pre>
+        <p class="label">Immediate response</p>
+<pre><code>{
+  "status": "accepted",
+  "message": "The build and deploy process has been started in the background."
+}</code></pre>
+        <p class="label">Posted to the callback URL when the site is live</p>
+<pre><code>{
+  "email": "you@example.com",
+  "task": "unit-converter",
+  "round": 1,
+  "nonce": "any-unique-string",
+  "repo_url": "https://github.com/&lt;owner&gt;/unit-converter",
+  "commit_sha": "&lt;sha&gt;",
+  "pages_url": "https://&lt;owner&gt;.github.io/unit-converter/"
+}</code></pre>
+        <p><code>GET /api/status</code> reports whether the LLM providers and GitHub are configured, without revealing any keys.</p>
+      </section>
 
-        <div class="field">
-          <label for="brief">Prompt Brief</label>
-          <textarea id="brief" required placeholder="Describe the web application, styling, features, and external CDN scripts...">Create a modern responsive calculator in HTML, CSS and JS. Include dark mode toggle and clean design.</textarea>
-        </div>
+      <section aria-labelledby="limits">
+        <h2 id="limits">Limits</h2>
+        <ul class="limits">
+          <li>Builds run as in-process background tasks. There is no job queue, so a restart loses builds in progress.</li>
+          <li>One shared secret protects the build endpoint. There are no user accounts or per-user rate limits.</li>
+          <li>The <code>checks</code> are passed to the model as requirements. The service does not run them against the generated site.</li>
+          <li>There are no automated tests in the repository yet.</li>
+          <li>The generated code is whatever the model writes. It is published without human review.</li>
+        </ul>
+      </section>
+    </main>
 
-        <div class="grid-2">
-          <div class="field">
-            <label for="evaluation_url">Evaluation Webhook URL</label>
-            <input type="url" id="evaluation_url" required value="https://httpbin.org/post" placeholder="Webhook to notify after deploy" />
-          </div>
-          <div class="field">
-            <label for="nonce">Nonce</label>
-            <input type="text" id="nonce" required value="nonce-test-123" />
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="checks">JS Checks / Evaluation Tests (Optional, one per line)</label>
-          <textarea id="checks" placeholder="document.querySelector('#calc') !== null&#10;typeof window.calculate === 'function'" style="min-height: 60px;"></textarea>
-          <div class="hint">Technical requirements that the LLM generated app must fulfill.</div>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-top: 18px;">
-          <button type="submit" id="submitBtn">Start Build &amp; Deploy</button>
-          <button type="button" class="btn-secondary" id="refreshBtn">Refresh Health</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Console Output</div>
-      <div class="console-box" id="consoleBox">> System initialized. Ready.</div>
-    </div>
+    <footer>
+      <p>Built by <a href="https://kbxai.github.io/projects/llm-code-deployment-agent/">Kartik Bajaj</a> for the IITM Tools in Data Science course.</p>
+      <p>Source on <a href="https://github.com/kbxai/LLM-Powered-Code-Deployment-Agent">GitHub</a>. Manual builds: <a href="/console">operator console</a> (needs the server secret).</p>
+    </footer>
   </div>
 
   <script>
-    const serverDot = document.getElementById("serverDot");
-    const serverStatusText = document.getElementById("serverStatusText");
-    const badgeAiPipe = document.getElementById("badgeAiPipe");
-    const badgeGemini = document.getElementById("badgeGemini");
-    const badgeGithub = document.getElementById("badgeGithub");
-    const consoleBox = document.getElementById("consoleBox");
-    const buildForm = document.getElementById("buildForm");
-    const submitBtn = document.getElementById("submitBtn");
-    const refreshBtn = document.getElementById("refreshBtn");
-
-    function log(message, type = "info") {
-      const line = document.createElement("div");
-      if (type === "success") line.className = "log-success";
-      if (type === "error") line.className = "log-error";
-      if (type === "info") line.className = "log-info";
-
-      const time = new Date().toLocaleTimeString();
-      line.textContent = `[${time}] ${message}`;
-      consoleBox.appendChild(line);
-      consoleBox.scrollTop = consoleBox.scrollHeight;
-    }
-
-    async function checkHealth() {
+    (async () => {
+      const dot = document.getElementById("dot");
+      const text = document.getElementById("status");
       try {
-        const response = await fetch("/api/status");
-        if (!response.ok) {
-          throw new Error("HTTP " + response.status);
-        }
-        const data = await response.json();
-
-        serverDot.classList.add("active");
-        serverStatusText.textContent = "Service Ready";
-
-        if (data.llm_providers.aipipe) {
-          badgeAiPipe.textContent = "AI Pipe: Active";
-          badgeAiPipe.className = "badge ready";
+        const res = await fetch("/api/status", { cache: "no-store" });
+        const s = await res.json();
+        const llm = s.llm_providers && (s.llm_providers.aipipe || s.llm_providers.gemini);
+        if (s.status === "online" && llm && s.github_configured) {
+          dot.classList.add("on");
+          text.textContent = "Service online. Builds need the server secret.";
         } else {
-          badgeAiPipe.textContent = "AI Pipe: Not Configured";
-          badgeAiPipe.className = "badge";
+          text.textContent = "Service online, but not fully configured for builds.";
         }
-
-        if (data.llm_providers.gemini) {
-          badgeGemini.textContent = "Gemini: Active";
-          badgeGemini.className = "badge ready";
-        } else {
-          badgeGemini.textContent = "Gemini: Not Configured";
-          badgeGemini.className = "badge";
-        }
-
-        if (data.github_configured) {
-          badgeGithub.textContent = "GitHub: Connected";
-          badgeGithub.className = "badge ready";
-        } else {
-          badgeGithub.textContent = "GitHub: Missing Credentials";
-          badgeGithub.className = "badge";
-        }
-
-        log("Health check passed. Service is online.", "success");
-      } catch (err) {
-        serverDot.classList.remove("active");
-        serverStatusText.textContent = "Connecting...";
-        log("Health check note: " + err.message, "error");
+      } catch {
+        text.textContent = "Could not reach the service. It may be starting up; refresh in a minute.";
       }
-    }
-
-    buildForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Submitting...";
-
-      const checksText = document.getElementById("checks").value.trim();
-      const checksList = checksText ? checksText.split("\n").map(s => s.trim()).filter(Boolean) : null;
-
-      const payload = {
-        email: document.getElementById("email").value.trim(),
-        secret: document.getElementById("secret").value.trim(),
-        task: document.getElementById("task").value.trim(),
-        round: parseInt(document.getElementById("round").value, 10),
-        nonce: document.getElementById("nonce").value.trim(),
-        brief: document.getElementById("brief").value.trim(),
-        evaluation_url: document.getElementById("evaluation_url").value.trim(),
-        checks: checksList
-      };
-
-      log(`Submitting task '${payload.task}' for Round ${payload.round}...`, "info");
-
-      try {
-        const res = await fetch("/api/build", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        const result = await res.json();
-        if (res.ok) {
-          log(`Task accepted: ${result.message}`, "success");
-          log(`Background build running. Output will be pushed to GitHub repository: ${payload.task}`, "info");
-        } else {
-          log(`Submission failed (${res.status}): ${result.detail || JSON.stringify(result)}`, "error");
-        }
-      } catch (err) {
-        log(`Network or request error: ${err.message}`, "error");
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Start Build & Deploy";
-      }
-    });
-
-    refreshBtn.addEventListener("click", () => {
-      log("Manual health refresh requested...", "info");
-      checkHealth();
-    });
-
-    checkHealth();
+    })();
   </script>
 </body>
 </html>
